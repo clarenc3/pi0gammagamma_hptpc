@@ -32,14 +32,12 @@ void pi0gammagamma(std::string fileName) {
 
   long int nevents = tn->GetEntries();
 
-  int nBins = 50;
-
   int eventCnt = 0;
 
-  double theta1 = -999;
-  double pgamma1 = -999;
-  double theta2 = -999;
-  double pgamma2 = -999;
+  double thetaHigh = -999;
+  double pgammaHigh = -999;
+  double thetaLow = -999;
+  double pgammaLow = -999;
   double thetagamma = -999;
   int nPi0 = -999;
   double pi0mom = -999;
@@ -47,29 +45,30 @@ void pi0gammagamma(std::string fileName) {
 
   TFile *output = new TFile((fileName+"_output.root").c_str(), "recreate");
   TTree *tree = new TTree("tree", "tree");
-  tree->Branch("thgamma1", &theta1);
-  tree->Branch("pgamma1", &pgamma1);
-  tree->Branch("thgamma2", &theta2);
-  tree->Branch("pgamma2", &pgamma2);
-  tree->Branch("thgamma1gamma2", &thetagamma);
+  tree->Branch("thgammaHigh", &thetaHigh);
+  tree->Branch("pgammaHigh", &pgammaHigh);
+  tree->Branch("thgammaLow", &thetaLow);
+  tree->Branch("pgammaLow", &pgammaLow);
+  tree->Branch("thgammaHighgammaLow", &thetagamma);
   tree->Branch("ppi0", &pi0mom);
   tree->Branch("thpi0", &pi0th);
   tree->Branch("nPi0", &nPi0);
 
-  std::cout << "number of events: " << nevents << std::endl;
+  std::cout << "Number of events: " << nevents << std::endl;
 
-  TStopwatch clock;
-  clock.Start();
+  // 20 messages will do the job
+  int countwidth = double(nevents)/double(20);
 
+  // Random number for generator the theta and phi in pi0 rest-frame
   TRandom3 *rand = new TRandom3();
 
   for (int j = 0; j < nevents; j++) {
 
     // Reset the variables
-    theta1 = -999;
-    pgamma1 = -999;
-    theta2 = -999;
-    pgamma2 = -999;
+    thetaHigh = -999;
+    pgammaHigh = -999;
+    thetaLow = -999;
+    pgammaLow = -999;
     thetagamma = -999;
     nPi0 = 0;
     pi0mom = -999;
@@ -77,7 +76,9 @@ void pi0gammagamma(std::string fileName) {
 
     tn->GetEntry(j);
 
-    if (j%50000 == 0) std::cout << "On event #" << j << std::endl;
+    if (j % countwidth == 0) {
+      std::cout << "On event " << j << "/" << nevents << " (" << int(double(j)/double(nevents)*100.0) << "%)" << std::endl;
+    }
 
     TLorentzVector Ppi0;
 
@@ -125,18 +126,26 @@ void pi0gammagamma(std::string fileName) {
     gamma1.Boost(Ppi0.BoostVector());
     gamma2.Boost(Ppi0.BoostVector());
 
-    // Make into degrees
-    theta1 = 180.0/M_PI*gamma1.Vect().Angle(Pnu.Vect());
-    theta2 = 180.0/M_PI*gamma2.Vect().Angle(Pnu.Vect());
-    thetagamma = 180.0/M_PI*gamma2.Vect().Angle(gamma1.Vect());
-    pgamma1 = gamma1.Vect().Mag();
-    pgamma2 = gamma2.Vect().Mag();
+    // Select highest momentum gamma to be "high" and lowest momentum to be "low"
+    if (gamma1.Vect().Mag() > gamma2.Vect().Mag()) {
+      thetaHigh = 180.0/M_PI*gamma1.Vect().Angle(Pnu.Vect());
+      pgammaHigh = gamma1.Vect().Mag();
+      thetagamma = 180.0/M_PI*gamma1.Vect().Angle(gamma2.Vect());
+      thetaLow = 180.0/M_PI*gamma2.Vect().Angle(Pnu.Vect());
+      pgammaLow = gamma2.Vect().Mag();
+    } else {
+      thetaHigh = 180.0/M_PI*gamma2.Vect().Angle(Pnu.Vect());
+      pgammaHigh = gamma2.Vect().Mag();
+      thetagamma = 180.0/M_PI*gamma2.Vect().Angle(gamma1.Vect());
+      thetaLow = 180.0/M_PI*gamma1.Vect().Angle(Pnu.Vect());
+      pgammaLow = gamma1.Vect().Mag();
+    }
 
     tree->Fill();
 
   } // End for loop over all events
 
-  std::cout << eventCnt << " event passed the cuts" << std::endl;
+  std::cout << eventCnt << "/" << nevents << " (" << int(double(eventCnt)/double(nevents)*100.0) << "%) events passed the cuts" << std::endl;
   output->cd();
   tree->Write();
   output->Close();
